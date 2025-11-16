@@ -2,56 +2,65 @@
 
 ## Context
 
-The packer-plugin-dagger-cli currently fails with "does not support Protobuf" error when users run `packer init`. This indicates the plugin is compiled with an older Packer plugin API version (x4 or earlier) that doesn't support modern gRPC/Protobuf communication.
-
-Packer's latest plugin API version (x5) requires:
-- packer-plugin-sdk >= 0.6.2
-- gRPC/Protobuf support for plugin communication
-- Proper API version declaration in plugin metadata
+The packer-plugin-dagger-cli project was scaffolded from a Packer plugin template that included example implementations for builders, datasources, post-processors, and provisioners. The plugin is now focused solely on the `dagger-cli` provisioner, making all scaffolding artifacts unnecessary.
 
 ## Goal
 
-Update the plugin to support Packer's x5 API version, eliminating the "does not support Protobuf" error and ensuring compatibility with modern Packer (>= 1.10.2).
+Remove all scaffolding-related code, directories, and documentation from the project, leaving only the functional `dagger-cli` provisioner and its supporting infrastructure.
 
 ## Scope
 
 **In scope:**
-- Update packer-plugin-sdk dependency to latest version supporting x5 API
-- Update go.mod and run go mod tidy
-- Rebuild and test plugin with x5 API version
-- Verify `packer init` works without Protobuf errors
-- Update any documentation referencing API versions
+- Remove scaffolding imports from [`main.go`](packer/plugins/packer-plugin-dagger-cli/main.go)
+- Remove scaffolding plugin registrations from [`main.go`](packer/plugins/packer-plugin-dagger-cli/main.go)
+- Delete entire scaffolding directories:
+  - `builder/scaffolding/`
+  - `datasource/scaffolding/`
+  - `post-processor/scaffolding/`
+  - `provisioner/scaffolding/`
+- Delete scaffolding documentation files:
+  - `docs/builders/builder.mdx`
+  - `docs/datasources/datasource.mdx`
+  - `docs/post-processors/post-processor.mdx`
+  - `docs/provisioners/provisioner.mdx` (NOT `dagger-cli.mdx`)
+- Update any references to removed components
 
 **Out of scope:**
-- Changing plugin functionality or provisioner behavior
-- Modifying existing configuration schema
-- Adding new features or capabilities
-- Changing version numbering in version/VERSION
+- The [`provisioner/dagger-cli/`](packer/plugins/packer-plugin-dagger-cli/provisioner/dagger-cli/) directory and all its contents (MUST be preserved)
+- [`docs/provisioners/dagger-cli.mdx`](packer/plugins/packer-plugin-dagger-cli/docs/provisioners/dagger-cli.mdx) (MUST be preserved)
+- Build configuration ([`GNUmakefile`](packer/plugins/packer-plugin-dagger-cli/GNUmakefile), [`go.mod`](packer/plugins/packer-plugin-dagger-cli/go.mod), etc.)
+- Version management ([`version/`](packer/plugins/packer-plugin-dagger-cli/version/) directory)
+- OpenSpec documentation
+- [`README.md`](packer/plugins/packer-plugin-dagger-cli/README.md)
+- License and repo metadata
 
 ## Desired behaviour
 
-After the change:
-- `packer init .` successfully downloads and initializes the plugin
-- Plugin reports API version as "x5.0" in describe output
-- No "does not support Protobuf" errors occur
-- Plugin works with Packer >= 1.10.2
-- All existing tests pass with new SDK version
+After this change:
+
+- [`main.go`](packer/plugins/packer-plugin-dagger-cli/main.go) should only:
+  - Import the `dagger-cli` provisioner
+  - Register the `dagger-cli` provisioner
+  - Import version and plugin SDK packages
+- No scaffolding directories exist in the project
+- No scaffolding documentation exists in `docs/`
+- `go build` completes successfully (no import errors)
+- `make dev` target runs successfully
+- The plugin's `describe` output shows only the `dagger-cli` provisioner
 
 ## Constraints & assumptions
 
-- Assume packer-plugin-sdk v0.6.2+ supports x5 API (verify latest version)
-- Assume no breaking changes in SDK API between v0.6.1 and latest
-- Plugin versioning still uses version/VERSION file (no change to versioning strategy)
-- Binary naming and build process remain unchanged (follow packer-versioning-testing rules)
-- All lowercase conventions for git paths and plugin names remain (follow packer-versioning-testing rules)
+- Assume scaffolding code has no dependencies outside its own directories
+- Assume all scaffolding components follow standard naming: "scaffolding", "my-builder", "my-provisioner", "my-post-processor", "my-datasource"
+- The plugin should remain buildable and testable after cleanup
+- No functional changes to the `dagger-cli` provisioner
 
 ## Acceptance criteria
 
-- [ ] go.mod updated with packer-plugin-sdk version supporting x5 API
-- [ ] `go mod tidy` executed successfully
-- [ ] `make dev` builds plugin without errors
-- [ ] `packer-plugin-dagger-cli describe` shows `"api_version": "x5.0"`
-- [ ] Test template with `required_plugins` block runs `packer init` without "Protobuf" errors
-- [ ] `packer build` successfully executes with updated plugin
-- [ ] All existing unit tests pass
-- [ ] GNUmakefile build targets still work correctly
+- [ ] [`main.go`](packer/plugins/packer-plugin-dagger-cli/main.go) contains no scaffolding imports
+- [ ] [`main.go`](packer/plugins/packer-plugin-dagger-cli/main.go) registers only the `dagger-cli` provisioner
+- [ ] All scaffolding directories deleted: `builder/`, `datasource/`, `post-processor/`, `provisioner/scaffolding/`
+- [ ] All scaffolding docs deleted except [`docs/provisioners/dagger-cli.mdx`](packer/plugins/packer-plugin-dagger-cli/docs/provisioners/dagger-cli.mdx)
+- [ ] `go build` succeeds without errors
+- [ ] `make dev` succeeds and produces a working plugin binary
+- [ ] Plugin `describe` output contains only `dagger-cli` in provisioners array
