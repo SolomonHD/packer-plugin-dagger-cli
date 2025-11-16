@@ -97,7 +97,7 @@ See the [documentation](docs/provisioners/dagger-cli.mdx) for complete configura
 - **Packer**: >= 1.10.2
 - **Go**: >= 1.23 (for building from source)
 - **Dagger CLI**: Must be installed and available in PATH
-- **packer-plugin-sdk**: >= 0.6.1
+- **packer-plugin-sdk**: >= 0.6.2 (supports x5 API)
 
 ## Build from Source
 
