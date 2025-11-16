@@ -1,4 +1,4 @@
-module github.com/hashicorp/packer-plugin-scaffolding
+module github.com/hashicorp/packer-plugin-dagger-cli
 
 go 1.23.2
 

@@ -5,8 +5,9 @@ package version
 
 import "github.com/hashicorp/packer-plugin-sdk/version"
 
+// Version is set via ldflags at build time from version/VERSION file
 var (
-	Version           = "0.0.1"
+	Version           = "dev"
 	VersionPrerelease = ""
 	VersionMetadata   = ""
 	PluginVersion     = version.NewPluginVersion(Version, VersionPrerelease, VersionMetadata)

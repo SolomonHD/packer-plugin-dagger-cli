@@ -1,90 +1,196 @@
-# Packer Plugin Scaffolding
+# Packer Plugin for Dagger CLI
 
-This repository is a template for a Packer multi-component plugin. It is intended as a starting point for creating Packer plugins, containing:
-- A builder ([builder/scaffolding](builder/scaffolding))
-- A provisioner ([provisioner/scaffolding](provisioner/scaffolding))
-- A post-processor ([post-processor/scaffolding](post-processor/scaffolding))
-- A data source ([datasource/scaffolding](datasource/scaffolding))
-- Docs ([docs](docs))
-- A working example ([example](example))
+This plugin enables integration between [Packer](https://www.packer.io) and [Dagger](https://dagger.io), allowing you to execute Dagger CLI commands during image provisioning. This brings container-based reproducible workflows to Packer builds.
 
-These folders contain boilerplate code that you will need to edit to create your own Packer multi-component plugin.
-A full guide to creating Packer plugins can be found at [Extending Packer](https://www.packer.io/docs/plugins/creation).
+## Features
 
-In this repository you will also find a pre-defined GitHub Action configuration for the release workflow
-(`.goreleaser.yml` and `.github/workflows/release.yml`). The release workflow configuration makes sure the GitHub
-release artifacts are created with the correct binaries and naming conventions.
+- **dagger-cli provisioner**: Execute Dagger CLI commands during provisioning
+- **Retry mechanisms**: Configurable retry logic with exponential backoff
+- **Caching control**: Support for Dagger's caching modes (auto, disabled, keyed)
+- **Structured logging**: Detailed logging with configurable verbosity levels
+- **Full argument support**: Pass arguments, environment variables, and configuration
+- **Local and remote modules**: Support for both local and remote Dagger modules
 
-Please see the [GitHub template repository documentation](https://docs.github.com/en/free-pro-team@latest/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template)
-for how to create a new repository from this template on GitHub.
+## Installation
 
-## Packer plugin projects
+### Using `packer init` (Recommended)
 
-Here's a non exaustive list of Packer plugins that you can checkout:
+Add the plugin to your Packer template:
 
-* [github.com/hashicorp/packer-plugin-docker](https://github.com/hashicorp/packer-plugin-docker)
-* [github.com/exoscale/packer-plugin-exoscale](https://github.com/exoscale/packer-plugin-exoscale)
-* [github.com/sylviamoss/packer-plugin-comment](https://github.com/sylviamoss/packer-plugin-comment)
-* [github.com/hashicorp/packer-plugin-hashicups](https://github.com/hashicorp/packer-plugin-hashicups)
-
-Looking at their code will give you good examples.
-
-## Build from source
-
-1. Clone this GitHub repository locally.
-
-2. Run this command from the root directory: 
-```shell 
-go build -ldflags="-X github.com/hashicorp/packer-plugin-scaffolding/version.VersionPrerelease=dev" -o packer-plugin-scaffolding
+```hcl
+packer {
+  required_plugins {
+    dagger-cli = {
+      source  = "github.com/hashicorp/dagger-cli"
+      version = ">= 0.1.0"
+    }
+  }
+}
 ```
 
-3. After you successfully compile, the `packer-plugin-scaffolding` plugin binary file is in the root directory. 
+Then run:
 
-4. To install the compiled plugin, run the following command 
 ```shell
-packer plugins install --path packer-plugin-scaffolding github.com/hashicorp/scaffolding
+packer init .
 ```
 
-### Build on *nix systems
-Unix like systems with the make, sed, and grep commands installed can use the `make dev` to execute the build from source steps. 
+### Manual Installation
 
-### Build on Windows Powershell
-The preferred solution for building on Windows are steps 2-4 listed above.
-If you would prefer to script the building process you can use the following as a guide
+Download the latest release from the [releases page](https://github.com/hashicorp/packer-plugin-dagger-cli/releases) and install using:
 
-```powershell
-$MODULE_NAME = (Get-Content go.mod | Where-Object { $_ -match "^module"  }) -replace 'module ',''
-$FQN = $MODULE_NAME -replace 'packer-plugin-',''
-go build -ldflags="-X $MODULE_NAME/version.VersionPrerelease=dev" -o packer-plugin-scaffolding.exe
-packer plugins install --path packer-plugin-scaffolding.exe $FQN
+```shell
+packer plugins install --path packer-plugin-dagger-cli github.com/hashicorp/dagger-cli
 ```
 
-## Running Acceptance Tests
+## Usage
 
-Make sure to install the plugin locally using the steps in [Build from source](#build-from-source).
+### Basic Example
 
-Once everything needed is set up, run:
+```hcl
+provisioner "dagger-cli" {
+  module = "github.com/acme/infra//ci?ref=v1.2.3"
+  call   = "configure_system"
+
+  args = {
+    region = "us-east-1"
+    fast   = true
+  }
+}
 ```
+
+### With Retries
+
+```hcl
+provisioner "dagger-cli" {
+  module = "./ci"
+  call   = "deploy"
+
+  retry_count   = 3
+  retry_backoff = "10s"
+
+  args = {
+    environment = "production"
+  }
+}
+```
+
+### With Keyed Caching
+
+```hcl
+provisioner "dagger-cli" {
+  module = "./infrastructure"
+  call   = "provision"
+
+  cache_mode = "keyed"
+  cache_key  = "ubuntu-22.04-base"
+
+  args = {
+    os_version = "22.04"
+  }
+}
+```
+
+See the [documentation](docs/provisioners/dagger-cli.mdx) for complete configuration options and examples.
+
+## Requirements
+
+- **Packer**: >= 1.10.2
+- **Go**: >= 1.23 (for building from source)
+- **Dagger CLI**: Must be installed and available in PATH
+- **packer-plugin-sdk**: >= 0.6.1
+
+## Build from Source
+
+1. Clone this repository:
+
+   ```shell
+   git clone https://github.com/hashicorp/packer-plugin-dagger-cli.git
+   cd packer-plugin-dagger-cli
+   ```
+
+2. Build the plugin:
+
+   ```shell
+   VERSION=$(cat version/VERSION)
+   go build -ldflags="-X github.com/hashicorp/packer-plugin-dagger-cli/version.Version=$VERSION -X github.com/hashicorp/packer-plugin-dagger-cli/version.VersionPrerelease=" -o packer-plugin-dagger-cli
+   ```
+
+3. Install the plugin:
+
+   ```shell
+   packer plugins install --path packer-plugin-dagger-cli github.com/hashicorp/dagger-cli
+   ```
+
+### Quick Build (Unix-like systems)
+
+```shell
+make dev
+```
+
+## Development
+
+### Running Tests
+
+Run unit tests:
+
+```shell
+go test ./provisioner/dagger-cli/ -v
+```
+
+Run all tests:
+
+```shell
+go test -race -count 1 ./... -timeout=3m
+```
+
+### Running Acceptance Tests
+
+```shell
+make testacc
+```
+
+Or manually:
+
+```shell
 PACKER_ACC=1 go test -count 1 -v ./... -timeout=120m
 ```
 
-This will run the acceptance tests for all plugins in this set.
+### Code Generation
 
-## Registering Plugin as Packer Integration
+Generate HCL2 specs:
 
-Partner and community plugins can be hard to find if a user doesn't know what 
-they are looking for. To assist with plugin discovery Packer offers an integration
-portal at https://developer.hashicorp.com/packer/integrations to list known integrations 
-that work with the latest release of Packer. 
+```shell
+go generate ./...
+```
 
-Registering a plugin as an integration requires [metadata configuration](./metadata.hcl) within the plugin
-repository and approval by the Packer team. To initiate the process of registering your 
-plugin as a Packer integration refer to the [Developing Plugins](https://developer.hashicorp.com/packer/docs/plugins/creation#registering-plugins) page.
+Or:
 
-# Requirements
+```shell
+make generate
+```
 
--	[packer-plugin-sdk](https://github.com/hashicorp/packer-plugin-sdk) >= v0.5.2
--	[Go](https://golang.org/doc/install) >= 1.20
+## Documentation
 
-## Packer Compatibility
-This scaffolding template is compatible with Packer >= v1.10.2
+- [Provisioner Documentation](docs/provisioners/dagger-cli.mdx) - Complete configuration reference
+- [Examples](example/) - Working example templates
+- [Packer Plugins](https://www.packer.io/docs/plugins) - General Packer plugin documentation
+- [Dagger Documentation](https://docs.dagger.io) - Dagger CLI and module documentation
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with tests
+4. Submit a pull request
+
+## License
+
+MPL-2.0 License - see [LICENSE](LICENSE) for details.
+
+## Support
+
+- [GitHub Issues](https://github.com/hashicorp/packer-plugin-dagger-cli/issues) - Bug reports and feature requests
+- [Packer Community Forum](https://discuss.hashicorp.com/c/packer) - General questions and discussions
+- [Dagger Discord](https://discord.gg/dagger-io) - Dagger-specific questions

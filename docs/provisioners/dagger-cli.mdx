@@ -1,0 +1,273 @@
+---
+description: |
+  The dagger-cli provisioner executes Dagger CLI commands during image provisioning,
+  enabling container-based reproducible workflows in Packer builds.
+page_title: Dagger CLI - Provisioners
+nav_title: dagger-cli
+---
+
+# Dagger CLI Provisioner
+
+Type: `dagger-cli`
+
+The `dagger-cli` provisioner executes [Dagger](https://dagger.io) CLI commands during
+the provisioning phase of a Packer build. This enables you to leverage Dagger's
+container-based pipeline capabilities for system configuration, package installation,
+and other provisioning tasks.
+
+## Basic Example
+
+```hcl
+provisioner "dagger-cli" {
+  module = "github.com/acme/infra//ci?ref=v1.2.3"
+  call   = "configure_system"
+
+  args = {
+    region = "us-east-1"
+    fast   = true
+    count  = 3
+  }
+
+  env = {
+    ENVIRONMENT = "staging"
+  }
+}
+```
+
+## Configuration Reference
+
+### Required
+
+- `call` (string) - The Dagger call/entrypoint name to execute.
+
+- `module` (string) - The Dagger module reference. This can be:
+  - A GitHub repository: `github.com/org/repo//path?ref=tag`
+  - A local directory: `./ci` or `../modules/app`
+  - Any valid Dagger module source
+
+  **Note:** Either `module` or `file` must be specified, but not both.
+
+- `file` (string) - Path to a local Dagger module file. The provisioner will derive
+  the module directory from the file path.
+
+  **Note:** Either `module` or `file` must be specified, but not both.
+
+### Optional
+
+- `args` (map[string]any) - Named arguments to pass to the Dagger call. Supports:
+  - **Strings**: `region = "us-east-1"` → `--region=us-east-1`
+  - **Numbers**: `count = 3` → `--count=3`
+  - **Booleans**: 
+    - `true` → `--flag-name` (flag only)
+    - `false` → omitted
+
+- `env` (map[string]string) - Environment variables to set for the Dagger CLI process.
+  These are merged with the existing environment.
+
+- `working_dir` (string) - Working directory for the Dagger CLI command. Defaults to
+  Packer's working directory.
+
+- `log_level` (string) - Control the verbosity of provisioner logs. Valid values:
+  - `"trace"` - Full command details with arguments
+  - `"debug"` - Detailed execution information
+  - `"info"` - Summary logs (default)
+  - `"warn"` - Warnings and errors only
+  - `"error"` - Errors only
+
+- `retry_count` (int) - Number of retry attempts if the Dagger command fails. Default: `0`.
+
+- `retry_backoff` (string) - Base duration for retry backoff (e.g., `"5s"`, `"30s"`, `"2m"`).
+  The actual delay is `attempt_number × retry_backoff`. Default: `"5s"` when retries are enabled.
+
+- `cache_mode` (string) - Dagger caching mode. Valid values:
+  - `"auto"` - Use Dagger's default caching behavior (default)
+  - `"disabled"` - Disable caching entirely
+  - `"keyed"` - Use a specific cache key (requires `cache_key`)
+
+- `cache_key` (string) - Cache key to use when `cache_mode = "keyed"`. The provisioner
+  computes an effective cache key from this value combined with the module, call, and args.
+
+## Examples
+
+### Local Module
+
+```hcl
+provisioner "dagger-cli" {
+  module = "./ci"
+  call   = "build_image"
+
+  args = {
+    region = "us-west-2"
+  }
+}
+```
+
+### File-Based Module
+
+When using `file`, the provisioner derives the module directory from the file path:
+
+```hcl
+provisioner "dagger-cli" {
+  file = "ci/pipeline.py"
+  call = "configure_system"
+
+  args = {
+    region = "us-east-1"
+  }
+}
+```
+
+This is equivalent to `dagger call -m ci configure_system --region=us-east-1`.
+
+### With Retries and Custom Backoff
+
+```hcl
+provisioner "dagger-cli" {
+  module = "github.com/acme/infra//ci?ref=v1.2.3"
+  call   = "deploy_app"
+
+  retry_count   = 3
+  retry_backoff = "10s"
+
+  args = {
+    environment = "production"
+  }
+}
+```
+
+This configuration will:
+- Attempt the command up to 4 times total (initial + 3 retries)
+- Wait 10s after first failure, 20s after second failure, 30s after third failure
+
+### With Keyed Caching
+
+```hcl
+provisioner "dagger-cli" {
+  module = "github.com/acme/infra//ci?ref=v1.2.3"
+  call   = "configure_system"
+
+  cache_mode = "keyed"
+  cache_key  = "ubuntu-22.04-base"
+
+  args = {
+    os_version = "22.04"
+  }
+}
+```
+
+### With Debug Logging
+
+```hcl
+provisioner "dagger-cli" {
+  module    = "./ci"
+  call      = "install_packages"
+  log_level = "debug"
+
+  args = {
+    packages = "nginx,postgresql"
+  }
+}
+```
+
+### Environment Variables
+
+```hcl
+provisioner "dagger-cli" {
+  module = "github.com/acme/infra//ci"
+  call   = "deploy"
+
+  env = {
+    AWS_REGION      = "us-east-1"
+    ENVIRONMENT     = "staging"
+    DEPLOY_VERSION  = "v2.1.0"
+  }
+
+  args = {
+    service = "api"
+  }
+}
+```
+
+## Error Handling
+
+The provisioner will fail the Packer build if:
+
+1. The Dagger CLI command exits with a non-zero status code after all retry attempts
+2. Configuration validation fails (e.g., missing required fields, invalid values)
+3. The command cannot be constructed (e.g., unsupported argument types)
+
+## Retry Behavior
+
+When `retry_count > 0`, the provisioner implements linear backoff:
+
+- **Attempt 1**: Immediate execution
+- **Attempt 2**: Wait `1 × retry_backoff`
+- **Attempt 3**: Wait `2 × retry_backoff`
+- **Attempt 4**: Wait `3 × retry_backoff`
+- And so on...
+
+Example with `retry_count = 3` and `retry_backoff = "5s"`:
+- Try immediately
+- If failed, wait 5s and try again
+- If failed, wait 10s and try again  
+- If failed, wait 15s and try again
+- If still failed, abort build
+
+## Cache Behavior
+
+### Auto Mode (Default)
+
+Uses Dagger's default caching behavior. Dagger will cache based on its own heuristics.
+
+### Disabled Mode
+
+```hcl
+cache_mode = "disabled"
+```
+
+Disables all Dagger caching by setting `DAGGER_CACHE_DISABLED=1`.
+
+### Keyed Mode
+
+```hcl
+cache_mode = "keyed"
+cache_key  = "my-unique-key"
+```
+
+Uses a specific cache key. The provisioner computes an effective cache key by hashing:
+- The provided `cache_key`
+- The module or file path
+- The call name
+- The args (as JSON)
+
+This ensures different configurations don't share cache incorrectly.
+
+## Requirements
+
+- **Dagger CLI**: Must be installed and available in PATH
+- **Dagger Module**: The specified module must be accessible (local path exists or remote is reachable)
+- **Network**: Required for remote module references and Dagger's container operations
+
+## Logging
+
+The provisioner logs execution details with the prefix `[dagger-cli]`:
+
+```
+[dagger-cli] module=./ci call=build attempts=1 log_level=info cache_mode=auto
+[dagger-cli] attempt 1/1 starting
+[dagger-cli] attempt 1/1 finished in 42.3s (success)
+```
+
+When retries occur:
+
+```
+[dagger-cli] attempt 1/3 failed (exit_code=1). Retrying in 5s...
+[dagger-cli] attempt 2/3 starting
+```
+
+## Notes
+
+- The provisioner shells out to the Dagger CLI rather than using the Dagger SDK
+- All Dagger CLI output (stdout/stderr) is displayed in Packer's output
+- The provisioner does not manage the Dagger daemon lifecycle
+- Complex argument types (arrays, objects) are not currently supported

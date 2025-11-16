@@ -1,4 +1,4 @@
-NAME=scaffolding
+NAME=dagger-cli
 BINARY=packer-plugin-${NAME}
 
 COUNT?=1
