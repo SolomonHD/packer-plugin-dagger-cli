@@ -1,0 +1,31 @@
+schema: spec-driven
+context: |
+  This repository is a Packer x5 plugin written in Go 1.23.2. It registers
+  one `dagger-cli` provisioner through github.com/hashicorp/packer-plugin-sdk
+  v0.6.4 and shells out to the external `dagger` CLI during Packer builds.
+
+  The provisioner accepts a local or remote Dagger module, a call name,
+  scalar arguments, environment variables, an optional working directory,
+  retry settings, log level, and cache settings. It does not use the Packer
+  communicator and does not manage the Dagger engine lifecycle.
+
+  Follow standard Go formatting. Bind HCL with mapstructure tags and regenerate
+  packer-sdc HCL2 specs after Config changes. Prefix provisioner errors with
+  `dagger-cli:` and UI messages with `[dagger-cli]`. Keep plugin paths, module
+  names, and Git organizations lowercase.
+
+  `version/VERSION` is the release-version source of truth. Validate changes
+  with `go test ./...`, `go vet ./...`, `go build ./...`, `make plugin-check`,
+  and `openspec validate --all --strict` as appropriate. Real Dagger/Packer
+  acceptance tests require their external prerequisites and should remain
+  explicitly gated.
+rules:
+  proposal:
+    - Identify affected capabilities and important code paths.
+    - Call out changes to HCL configuration or Dagger CLI invocation semantics.
+  specs:
+    - Use SHALL or MUST for normative behavior.
+    - Include at least one testable Scenario for every requirement.
+  tasks:
+    - Include HCL2 regeneration when Config structs or mapstructure tags change.
+    - Include unit tests, build verification, and strict OpenSpec validation.
